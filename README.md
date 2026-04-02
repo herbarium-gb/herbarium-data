@@ -1,12 +1,13 @@
 # hbdb-to-dwc
 
-Pipeline for exporting herbarium data from FileMaker and transforming it to Darwin Core (DwC).
+Pipeline for exporting herbarium data from FileMaker, transforming it to Darwin Core (DwC), and optionally loading it into PostgreSQL.
 
 ## Overview
 
 - Fetch raw data from FileMaker API
 - Transform to Darwin Core
-- Export CSV and optional QA tables
+- Export DwC CSV and QA tables
+- Optionally load raw and DwC data into PostgreSQL
 
 ## Requirements
 
@@ -18,7 +19,9 @@ install.packages(c(
   "readxl",
   "sf",
   "readr",
-  "writexl"
+  "writexl",
+  "DBI",
+  "RPostgres"
 ))
 ```
 
@@ -26,40 +29,50 @@ install.packages(c(
 
 Create a `.Renviron` file:
 
-```text
-HBDB_API_PWD=your_password_here
-FM_BASE_URL=your_base_url_here
+```r
+HBDB_API_PWD=your_password_here  
+FM_BASE_URL=https://your-filemaker-server  
+
+PGDATABASE=herbarium  
+PGUSER=herbarium  
+PGPASSWORD=your_password_here  
+PGHOST=localhost  
+PGPORT=5432  
 ```
 
 Restart R after changes.
 
-## Inputs
-
-- Column map: `config/col-map.xlsx`
-- Raw data: `data/raw/fm_raw_YYMMDD-HHMMSS.xlsx`
-
 ## Run
+
+Run the full pipeline:
 
 ```r
 source("scripts/run_pipeline.R", echo = FALSE)
 ```
 
-Set in `scripts/run_pipeline.R`:
+### Settings in run_pipeline.R
 
 ```r
-input_mode <- "file"   # or "fetch"
+input_mode <- "file"   # "file" or "fetch"  
+load_to_db <- FALSE    # TRUE to load into PostgreSQL  
 ```
+
+## PostgreSQL
+
+To enable database loading:
+
+- A PostgreSQL instance must be running
+- Tables `raw.fm_specimen` and `public.dwc_occurrence` must exist
+- Connection is configured via `.Renviron`
 
 ## Outputs
 
-- `data/output/occurrence_YYMMDD-HHMMSS.csv`
-- `data/output/bad_projected_coordinates.xlsx` (if needed)
+- data/dwc/occurrence_YYMMDD-HHMMSS.csv
+- data/qc/bad_projected_coordinates_YYMMDD-HHMMSS.xlsx (if needed)
 
 ## Notes
 
 - Coordinates derived from: decimal → DMS → SWEREF99 → RT90
 - Invalid projected coordinates are excluded and reported
 - Duplicate IDs are checked and reported
-- Raw and output data are ignored by Git
-- `config/col-map.xlsx` is versioned
-- `.Renviron` must not be committed
+- Data loading replaces all rows in target tables

@@ -4,7 +4,7 @@
 # - Uses latest raw export file by default:
 #   * data/raw/fm_raw_*.xlsx / .xls / .csv
 # - Uses latest DwC export file by default:
-#   * data/output/occurrence_*.csv
+#   * data/dwc/occurrence_*.csv
 # - Connects to PostgreSQL using environment variables
 # - Replaces table contents on each run:
 #   * TRUNCATE raw.fm_specimen
@@ -13,12 +13,10 @@
 # - Reports final row counts for both tables
 # ------------------------------------------------------------
 
-suppressPackageStartupMessages({
-  library(DBI)
-  library(RPostgres)
-  library(readr)
-  library(readxl)
-})
+library(DBI)
+library(RPostgres)
+library(readr)
+library(readxl)
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -51,12 +49,12 @@ raw_file <- get_latest_file(
 )
 
 dwc_file <- get_latest_file(
-  file.path("data", "output"),
+  file.path("data", "dwc"),
   "^occurrence_.*\\.csv$"
 )
 
-message("Using raw file: ", raw_file)
-message("Using DwC file: ", dwc_file)
+cat("Using raw file: ", raw_file, "\n", sep = "")
+cat("Using DwC file: ", dwc_file, "\n", sep = "")
 
 
 # --- Read input --------------------------------------------------------------
@@ -93,7 +91,11 @@ con <- dbConnect(
   password = get_env("PGPASSWORD")
 )
 
-on.exit(dbDisconnect(con), add = TRUE)
+if (!DBI::dbIsValid(con)) {
+  stop("PostgreSQL connection is not valid.")
+}
+
+cat("PostgreSQL connection: OK\n")
 
 
 # --- Replace raw and DwC tables ----------------------------------------------
@@ -142,3 +144,8 @@ cat("DwC file: ", dwc_file, "\n", sep = "")
 cat("Rows in raw.fm_specimen: ", format(raw_n, big.mark = " "), "\n", sep = "")
 cat("Rows in public.dwc_occurrence: ", format(dwc_n, big.mark = " "), "\n", sep = "")
 cat("Load complete.\n")
+
+
+# --- Disconnect --------------------------------------------------------------
+
+DBI::dbDisconnect(con)

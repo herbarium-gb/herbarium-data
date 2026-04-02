@@ -1,5 +1,5 @@
 # ------------------------------------------------------------
-# Herbarium export → Darwin Core (DwC)
+# Herbarium export -> Darwin Core (DwC)
 # ------------------------------------------------------------
 # - Loads raw herbarium export data and column mapping
 # - Uses fresh API data or latest raw export file
@@ -525,7 +525,7 @@ n_bad_rt90 <- nrow(bad_rt90)
 
 out_file <- file.path(
   "data",
-  "output",
+  "dwc",
   paste0("occurrence_", format(Sys.time(), "%y%m%d-%H%M%S"), ".csv")
 )
 
@@ -533,6 +533,12 @@ readr::write_excel_csv(
   dwc,
   out_file,
   na = ""
+)
+
+qa_file <- file.path(
+  "data",
+  "qc",
+  paste0("bad_projected_coordinates_", format(Sys.time(), "%y%m%d-%H%M%S"), ".xlsx")
 )
 
 qa_sheets <- list()
@@ -546,10 +552,7 @@ if (n_bad_sweref > 0) {
 }
 
 if (length(qa_sheets) > 0) {
-  write_xlsx(
-    qa_sheets,
-    file.path("data", "output", "bad_projected_coordinates.xlsx")
-  )
+  write_xlsx(qa_sheets, qa_file)
 }
 
 
@@ -564,7 +567,7 @@ cat("Invalid SWEREF rows: ", format(n_bad_sweref, big.mark = " "), "\n", sep = "
 cat("Invalid RT90 rows: ", format(n_bad_rt90, big.mark = " "), "\n", sep = "")
 
 if (length(qa_sheets) > 0) {
-  cat("QA file written: data/output/bad_projected_coordinates.xlsx\n")
+  cat("QA file written: ", qa_file, "\n", sep = "")
 } else {
   cat("QA file not written: no invalid projected coordinates found\n")
 }
@@ -583,4 +586,13 @@ if (!"id" %in% names(dwc)) {
 
 # --- Keep only main outputs --------------------------------------------------
 
-rm(list = setdiff(ls(), c("fm_raw", "dwc", "bad_rt90", "bad_sweref", "dup_ids")))
+rm(list = setdiff(ls(), c(
+  "fm_raw",
+  "dwc",
+  "bad_rt90",
+  "bad_sweref",
+  "dup_ids",
+  "load_to_db",
+  "input_mode"
+)))
+

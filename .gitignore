@@ -14,13 +14,8 @@
 # Excel temp files
 ~$*
 
-# Raw exports from FileMaker
-data/raw/fm_raw_*.xlsx
-
-# Generated outputs
-data/output/occurrence_*.csv
-data/output/bad_projected_coordinates.xlsx
-
-# Optional: keep directories in Git if you add .gitkeep files
+data/*
+!data/.gitkeep
 !data/raw/.gitkeep
-!data/output/.gitkeep
+!data/dwc/.gitkeep
+!data/qc/.gitkeep
