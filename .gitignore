@@ -11,6 +11,9 @@
 # macOS
 .DS_Store
 
+# Excel temp files
+~$*
+
 # Raw exports from FileMaker
 data/raw/fm_raw_*.xlsx
 

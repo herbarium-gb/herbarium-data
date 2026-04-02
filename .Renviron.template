@@ -1,0 +1,12 @@
+# --- PostgreSQL ------------------------------------------------
+
+PGDATABASE=herbarium
+PGUSER=herbarium
+PGPASSWORD=your_password_here
+PGHOST=localhost
+PGPORT=5432
+
+# --- FileMaker API --------------------------------------------
+
+HBDB_API_PWD=your_password_here
+FM_BASE_URL=https://your-filemaker-server.example.com
