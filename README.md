@@ -1,6 +1,6 @@
 # herbarium-data
 
-Pipeline for exporting herbarium data from FileMaker, transforming it to Darwin Core (DwC), and optionally loading it into PostgreSQL.
+Scripts for exporting herbarium data from FileMaker, transforming it to Darwin Core (DwC), and optionally loading it into PostgreSQL.
 
 ## Overview
 
