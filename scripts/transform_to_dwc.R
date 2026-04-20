@@ -11,6 +11,7 @@
 #   * SWEREF99 TM
 #   * RT90
 # - Excludes invalid projected coordinates from transformation
+# - Checks associatedMedia links
 # - Exports DwC output and QA tables
 # ------------------------------------------------------------
 
@@ -45,7 +46,6 @@ if (exists("fm_raw", inherits = FALSE)) {
 col_map <- as.data.table(
   read_excel(file.path("config", "col-map.xlsx"), col_types = "text")
 )
-
 
 # --- Helpers -----------------------------------------------------------------
 
@@ -111,6 +111,21 @@ is_valid_sweref <- function(n, o) {
     o >= 250000 & o <= 950000
 }
 
+check_media_exists <- function(urls) {
+  urls <- trimws(as.character(urls))
+  
+  vapply(urls, function(u) {
+    if (is.na(u) || u == "") return(NA)
+    
+    tryCatch({
+      con <- url(u, open = "rb")
+      close(con)
+      TRUE
+    }, error = function(e) {
+      FALSE
+    })
+  }, logical(1))
+}
 
 # --- Prepare metadata --------------------------------------------------------
 
@@ -129,11 +144,13 @@ derived_cols <- c(
   "verbatimCoordinateSystem",
   "verbatimSRS",
   "dynamicProperties",
-  "eventDate"
+  "eventDate",
+  "year",
+  "month",
+  "day"
 )
 
 all_cols <- unique(c(dwc_cols, derived_cols))
-
 
 # --- Initialize DwC table ----------------------------------------------------
 
@@ -144,7 +161,6 @@ dwc <- data.table(matrix(
 ))
 
 setnames(dwc, all_cols)
-
 
 # --- Map source fields -------------------------------------------------------
 
@@ -159,7 +175,6 @@ if ("source-field" %in% names(col_map)) {
   }
 }
 
-
 # --- Apply constant values ---------------------------------------------------
 
 if ("value" %in% names(col_map)) {
@@ -172,7 +187,6 @@ if ("value" %in% names(col_map)) {
     }
   }
 }
-
 
 # --- Derived identifiers and media -------------------------------------------
 
@@ -190,7 +204,6 @@ if ("Image1" %in% names(fm_raw) && "AccessionNo" %in% names(fm_raw)) {
   )]
 }
 
-
 # --- Prepare numeric coordinate fields ---------------------------------------
 
 fm_raw[, `:=`(
@@ -199,7 +212,6 @@ fm_raw[, `:=`(
   RiketsN_num  = to_num(RiketsN),
   RiketsO_num  = to_num(RiketsO)
 )]
-
 
 # --- QA tables for invalid projected coordinates -----------------------------
 
@@ -241,7 +253,6 @@ bad_rt90 <- fm_raw[
   )
 ]
 
-
 # --- Coordinates: 1. direct decimal degrees ----------------------------------
 
 lon_deg <- to_num(fm_raw$LongitudeDegree)
@@ -262,7 +273,6 @@ dwc[idx_direct, `:=`(
   verbatimCoordinateSystem = "decimal degrees",
   verbatimSRS = "EPSG:4326"
 )]
-
 
 # --- Coordinates: 2. DMS -----------------------------------------------------
 
@@ -334,7 +344,6 @@ dwc[idx_dms, `:=`(
   verbatimSRS = "EPSG:4326"
 )]
 
-
 # --- Coordinates: 3. SWEREF99 TM ---------------------------------------------
 
 idx_missing <- !(has_value(dwc$decimalLatitude) & has_value(dwc$decimalLongitude))
@@ -365,7 +374,6 @@ if (any(idx_sweref)) {
     verbatimSRS = "EPSG:3006"
   )]
 }
-
 
 # --- Coordinates: 4. RT90 ----------------------------------------------------
 
@@ -398,7 +406,6 @@ if (any(idx_rt90)) {
   )]
 }
 
-
 # --- Mark excluded projected coordinates -------------------------------------
 
 bad_proj_any <- unique(c(bad_sweref$AccessionNo, bad_rt90$AccessionNo))
@@ -412,19 +419,17 @@ if (length(bad_proj_any) > 0 && "AccessionNo" %in% names(fm_raw)) {
   ]
 }
 
-
 # --- Dynamic properties ------------------------------------------------------
 
 if ("RUBIN" %in% names(fm_raw)) {
   dwc[, dynamicProperties := append_json_prop(dynamicProperties, "RUBIN", fm_raw$RUBIN)]
 }
 
-
 # --- eventDate ---------------------------------------------------------------
 
-yr <- as.integer(fm_raw$Year)
-mo <- as.integer(fm_raw$Month)
-dy <- as.integer(fm_raw$Day)
+yr <- suppressWarnings(as.integer(trimws(as.character(fm_raw$Year))))
+mo <- suppressWarnings(as.integer(trimws(as.character(fm_raw$Month))))
+dy <- suppressWarnings(as.integer(trimws(as.character(fm_raw$Day))))
 
 date <- rep(NA_character_, nrow(fm_raw))
 
@@ -450,7 +455,6 @@ dwc[] <- lapply(dwc, function(x) {
     x
   }
 })
-
 
 # --- Reorder columns ---------------------------------------------------------
 
@@ -504,8 +508,9 @@ extra_cols <- setdiff(names(dwc), wanted_order)
 
 dwc <- dwc[, c(wanted_order, extra_cols), with = FALSE]
 
+# --- QA summary objects ------------------------------------------------------
 
-# --- QA summary --------------------------------------------------------------
+qa_sheets <- list()
 
 n_rows <- nrow(dwc)
 
@@ -522,6 +527,33 @@ if ("id" %in% names(dwc)) {
 n_bad_sweref <- nrow(bad_sweref)
 n_bad_rt90 <- nrow(bad_rt90)
 
+if (n_bad_rt90 > 0) {
+  qa_sheets$bad_rt90 <- bad_rt90
+}
+
+if (n_bad_sweref > 0) {
+  qa_sheets$bad_sweref <- bad_sweref
+}
+
+# --- QA: media links ---------------------------------------------------------
+
+bad_media <- data.table()
+n_bad_media <- NA_integer_
+
+if (check_media && "associatedMedia" %in% names(dwc)) {
+  media_ok <- check_media_exists(dwc$associatedMedia)
+  
+  bad_media <- dwc[!is.na(media_ok) & !media_ok, .(
+    id,
+    associatedMedia
+  )]
+  
+  n_bad_media <- nrow(bad_media)
+  
+  if (n_bad_media > 0) {
+    qa_sheets$bad_media <- bad_media
+  }
+}
 
 # --- Export ------------------------------------------------------------------
 
@@ -540,23 +572,12 @@ readr::write_excel_csv(
 qa_file <- file.path(
   "data",
   "qc",
-  paste0("bad_projected_coordinates_", format(Sys.time(), "%y%m%d-%H%M%S"), ".xlsx")
+  paste0("qa_", format(Sys.time(), "%y%m%d-%H%M%S"), ".xlsx")
 )
-
-qa_sheets <- list()
-
-if (n_bad_rt90 > 0) {
-  qa_sheets$bad_rt90 <- bad_rt90
-}
-
-if (n_bad_sweref > 0) {
-  qa_sheets$bad_sweref <- bad_sweref
-}
 
 if (length(qa_sheets) > 0) {
   write_xlsx(qa_sheets, qa_file)
 }
-
 
 # --- Summary -----------------------------------------------------------------
 
@@ -567,11 +588,16 @@ cat("Output file: ", out_file, "\n", sep = "")
 cat("Rows in dwc: ", format(n_rows, big.mark = " "), "\n", sep = "")
 cat("Invalid SWEREF rows: ", format(n_bad_sweref, big.mark = " "), "\n", sep = "")
 cat("Invalid RT90 rows: ", format(n_bad_rt90, big.mark = " "), "\n", sep = "")
+if (is.na(n_bad_media)) {
+  cat("Invalid media links: not checked\n")
+} else {
+  cat("Invalid media links: ", format(n_bad_media, big.mark = " "), "\n", sep = "")
+}
 
 if (length(qa_sheets) > 0) {
   cat("QA file written: ", qa_file, "\n", sep = "")
 } else {
-  cat("QA file not written: no invalid projected coordinates found\n")
+  cat("QA file not written: no QA issues found\n")
 }
 
 if (!"id" %in% names(dwc)) {
@@ -585,7 +611,6 @@ if (!"id" %in% names(dwc)) {
   print(dup_ids)
 }
 
-
 # --- Keep only main outputs --------------------------------------------------
 
 rm(list = setdiff(ls(), c(
@@ -593,8 +618,8 @@ rm(list = setdiff(ls(), c(
   "dwc",
   "bad_rt90",
   "bad_sweref",
+  "bad_media",
   "dup_ids",
   "load_to_db",
   "input_mode"
 )))
-

@@ -14,6 +14,7 @@ rm(list = ls())
 input_mode <- "file"
 
 load_to_db <- TRUE
+check_media <- FALSE
 
 
 # --- Validate settings -------------------------------------------------------
