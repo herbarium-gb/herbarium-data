@@ -51,6 +51,7 @@ base <- "https://api.datacite.org/dois"
 resp <- GET(base, query = list(
   prefix         = doi_prefix,
   query          = query,
+  `fields[dois]` = "doi,identifiers",   # ~10x smaller pages; carried into next-links
   `page[size]`   = page_size,
   `page[cursor]` = 1
 ), timeout(120))
