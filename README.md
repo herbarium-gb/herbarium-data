@@ -215,19 +215,25 @@ After GBIF harvests the dataset, DiSSCo assigns a Digital Specimen DOI to each
 specimen (DataCite prefix `10.3535`). To surface them on GBIF they have to
 come back into our data as `dwc:digitalSpecimenID`.
 
-`scripts/fetch_dissco_dois.R` pulls the current `occurrenceID -> DOI` mapping
-from the public DataCite API (no login) and writes `config/dissco_dois.csv`
+`scripts/fetch_dissco_dois.R` pulls the `occurrenceID -> DOI` mapping from the
+public DataCite API (no login) and writes `config/dissco_dois.csv`
 (git-ignored, ~295k rows). `transform_to_dwc.R` joins that file on `id` and
 fills `digitalSpecimenID`; if the file is absent the column is left empty.
 
 ```r
-source("scripts/fetch_dissco_dois.R", echo = FALSE)   # takes a few minutes
+source("scripts/fetch_dissco_dois.R", echo = FALSE)
 ```
+
+By default it runs **incrementally**: it records the run time in
+`config/dissco_dois_synced.txt` and on the next run only fetches DOIs changed
+since then, merging them into the existing CSV — so after the first (few
+minutes, all 295k) run, later runs take seconds. Set `mode <- "full"` at the
+top of the script to force a complete re-fetch.
 
 Run it occasionally — a new specimen only gets a DOI after DiSSCo's next
 harvest, so the mapping is always slightly behind. DiSSCo re-versions a
-digital specimen when our data changes, but the DOI itself is stable, so no
-DOI already stored ever needs updating.
+digital specimen when our data changes, but the DOI itself is stable, so a
+stored DOI never needs updating.
 
 ## Outputs
 

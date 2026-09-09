@@ -22,6 +22,7 @@ data/*
 
 # Generated DOI lookup (rebuilt by scripts/fetch_dissco_dois.R)
 config/dissco_dois.csv
+config/dissco_dois_synced.txt
 
 # Downloaded DwC archives
 dwca-*/
