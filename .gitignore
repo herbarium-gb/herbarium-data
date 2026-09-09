@@ -19,3 +19,10 @@ data/*
 !data/raw/.gitkeep
 !data/dwc/.gitkeep
 !data/qc/.gitkeep
+
+# Generated DOI lookup (rebuilt by scripts/fetch_dissco_dois.R)
+config/dissco_dois.csv
+
+# Downloaded DwC archives
+dwca-*/
+dwca-*.zip

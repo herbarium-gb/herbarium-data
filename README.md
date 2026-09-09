@@ -48,9 +48,12 @@ standalone script.
 | Stage | Script | What it does |
 |-------|--------|--------------|
 | Fetch | `fetch_fm_data.R` | Pulls all records from the FileMaker Data API, writes `data/raw/fm_raw_*.xlsx`. Aborts if the API returns 0 rows. |
-| Transform | `transform_to_dwc.R` | Maps source fields to Darwin Core using `config/col-map.xlsx`, derives coordinates and `eventDate`, writes `data/dwc/occurrence_*.csv` and (if there are issues) `data/qc/qa_*.xlsx`. |
+| Transform | `transform_to_dwc.R` | Maps source fields to Darwin Core using `config/col-map.xlsx`, derives coordinates and `eventDate`, joins Digital Specimen DOIs if `config/dissco_dois.csv` is present, writes `data/dwc/occurrence_*.csv` and (if there are issues) `data/qc/qa_*.xlsx`. |
 | Load | `load_to_postgres.R` | Replaces `raw.fm_specimen` and `public.dwc_occurrence` with the latest raw and DwC files. Refuses to load an empty file. |
 | Publish | `publish_ipt.R` | Logs in to the IPT, publishes a new resource version, polls until it finishes, and checks the published record count. |
+
+`scripts/fetch_dissco_dois.R` is a separate, occasional job — see **Digital
+Specimen DOIs** below.
 
 ## Requirements
 
@@ -205,6 +208,26 @@ IPT resource must already have, set up by hand in the IPT:
 A resource missing any of these publishes an empty archive. `publish_ipt.R`
 stops if the new version has 0 records, or fewer than half the rows produced
 by the transform in the same session.
+
+## Digital Specimen DOIs
+
+After GBIF harvests the dataset, DiSSCo assigns a Digital Specimen DOI to each
+specimen (DataCite prefix `10.3535`). To surface them on GBIF they have to
+come back into our data as `dwc:digitalSpecimenID`.
+
+`scripts/fetch_dissco_dois.R` pulls the current `occurrenceID -> DOI` mapping
+from the public DataCite API (no login) and writes `config/dissco_dois.csv`
+(git-ignored, ~295k rows). `transform_to_dwc.R` joins that file on `id` and
+fills `digitalSpecimenID`; if the file is absent the column is left empty.
+
+```r
+source("scripts/fetch_dissco_dois.R", echo = FALSE)   # takes a few minutes
+```
+
+Run it occasionally — a new specimen only gets a DOI after DiSSCo's next
+harvest, so the mapping is always slightly behind. DiSSCo re-versions a
+digital specimen when our data changes, but the DOI itself is stable, so no
+DOI already stored ever needs updating.
 
 ## Outputs
 

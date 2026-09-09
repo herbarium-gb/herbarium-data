@@ -130,7 +130,7 @@ dwc_cols <- dwc_cols[dwc_cols != "" & !is.na(dwc_cols)]
 derived_cols <- c(
   "decimalLatitude", "decimalLongitude", "geodeticDatum", "georeferenceRemarks",
   "verbatimLatitude", "verbatimLongitude", "verbatimCoordinateSystem", "verbatimSRS",
-  "dynamicProperties", "eventDate", "year", "month", "day"
+  "dynamicProperties", "eventDate", "year", "month", "day", "digitalSpecimenID"
 )
 
 all_cols <- unique(c(dwc_cols, derived_cols))
@@ -177,6 +177,19 @@ if ("Image1" %in% names(fm_raw) && "AccessionNo" %in% names(fm_raw)) {
   dwc[idx, associatedMedia := paste0(
     "https://herbarium.gu.se/web/images/", fm_raw$AccessionNo[idx], ".jpg"
   )]
+}
+
+# --- Digital Specimen DOIs -------------------------------------------------
+# Lookup produced by scripts/fetch_dissco_dois.R. Optional: if the file is
+# absent, digitalSpecimenID is simply left empty.
+
+doi_file <- file.path("config", "dissco_dois.csv")
+if (file.exists(doi_file) && "id" %in% names(dwc)) {
+  dissco_dois <- fread(doi_file, colClasses = "character")   # columns: id, digitalSpecimenID
+  dwc[, digitalSpecimenID := dissco_dois$digitalSpecimenID[match(id, dissco_dois$id)]]
+  cat("Digital Specimen DOIs matched: ",
+      format(sum(has_value(dwc$digitalSpecimenID)), big.mark = " "), " / ",
+      format(nrow(dwc), big.mark = " "), "\n", sep = "")
 }
 
 # --- Prepare numeric coordinate fields ---------------------------------------
@@ -368,7 +381,7 @@ dwc[] <- lapply(dwc, function(x) {
 
 wanted_order <- c(
   "id", "institutionCode", "collectionCode", "basisOfRecord",
-  "occurrenceID", "occurrenceStatus", "catalogNumber", "recordNumber",
+  "occurrenceID", "digitalSpecimenID", "occurrenceStatus", "catalogNumber", "recordNumber",
   "recordedBy", "associatedMedia", "occurrenceRemarks", "verbatimLabel",
   "eventDate", "year", "month", "day",
   "continent", "country", "stateProvince", "county", "locality",
