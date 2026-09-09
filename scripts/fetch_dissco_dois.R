@@ -24,6 +24,7 @@ source_system <- "477-1FN-0FH"                 # DiSSCo source system: Herbarium
 doi_prefix    <- "10.3535"                     # DiSSCo's DataCite prefix
 overlap_days  <- 2L                            # re-query a few days back, to be safe
 page_size     <- 1000L
+sparse_fields <- TRUE                          # request only doi + identifiers (smaller pages)
 out_file      <- file.path("config", "dissco_dois.csv")
 state_file    <- file.path("config", "dissco_dois_synced.txt")
 
@@ -48,13 +49,11 @@ run_started <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
 
 base <- "https://api.datacite.org/dois"
 
-resp <- GET(base, query = list(
-  prefix         = doi_prefix,
-  query          = query,
-  `fields[dois]` = "doi,identifiers",   # ~10x smaller pages; carried into next-links
-  `page[size]`   = page_size,
-  `page[cursor]` = 1
-), timeout(120))
+q0 <- list(prefix = doi_prefix, query = query,
+           `page[size]` = page_size, `page[cursor]` = 1)
+if (sparse_fields) q0[["fields[dois]"]] <- "doi,identifiers"   # smaller pages; carried into next-links
+
+resp <- GET(base, query = q0, timeout(120))
 stop_for_status(resp)
 
 page   <- fromJSON(content(resp, as = "text", encoding = "UTF-8"), simplifyVector = FALSE)
@@ -63,7 +62,9 @@ cat("DOIs to page through: ", format(total, big.mark = " "), "\n", sep = "")
 
 rows      <- list()
 page_n    <- 0L
-max_pages <- ceiling(max(total, 1) / page_size) + 5L
+n_pages   <- ceiling(max(total, 1) / page_size)
+max_pages <- n_pages + 5L
+t0        <- Sys.time()
 
 repeat {
   page_n <- page_n + 1L
@@ -91,7 +92,11 @@ repeat {
     )
   }
 
-  if (page_n %% 25L == 0L) cat("  page ", page_n, " - kept ", length(rows), "\n", sep = "")
+  if (page_n %% 10L == 0L) {
+    el <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    cat(sprintf("  page %d/%d  kept %d  (%.0fs elapsed, ~%.0fs left)\n",
+                page_n, n_pages, length(rows), el, el / page_n * max(n_pages - page_n, 0)))
+  }
 
   nxt <- page$links$`next`
   if (is.null(nxt) || page_n >= max_pages) break
@@ -137,7 +142,8 @@ cat("Written:         ", out_file,                         "\n", sep = "")
 
 rm(list = intersect(ls(), c(
   "mode", "org_ror", "source_system", "doi_prefix", "overlap_days", "page_size",
-  "out_file", "state_file", "have_prev", "effective", "query", "since",
-  "run_started", "base", "resp", "page", "total", "rows", "page_n", "max_pages",
-  "nxt", "r", "item", "a", "doi", "psid", "idn", "parts", "d", "new", "old", "merged"
+  "sparse_fields", "out_file", "state_file", "have_prev", "effective", "query",
+  "since", "run_started", "base", "q0", "resp", "page", "total", "n_pages",
+  "max_pages", "t0", "el", "rows", "page_n", "nxt", "r", "item", "a", "doi",
+  "psid", "idn", "parts", "d", "new", "old", "merged"
 )))
