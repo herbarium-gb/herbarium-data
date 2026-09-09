@@ -124,9 +124,17 @@ ipt_published <- (function() {
   if (interactive()) {
     if (is_prod) {
       cat("*** PRODUCTION *** - this publishes to ", base_url, "\n", sep = "")
-      if (!identical(trimws(readline("Type PROD to confirm (anything else aborts): ")), "PROD")) {
-        cat("Aborted - production publish not confirmed.\n")
-        return(FALSE)
+      # Loop so buffered console input (e.g. from running via a pasted
+      # source() line) does not decide this - re-ask until PROD or a blank
+      # line. A blank line aborts.
+      repeat {
+        ans <- trimws(readline("Type PROD to confirm, or blank to abort: "))
+        if (identical(ans, "PROD")) break
+        if (!nzchar(ans)) {
+          cat("Aborted - production publish not confirmed.\n")
+          return(FALSE)
+        }
+        cat("Not confirmed. Type PROD exactly, or leave blank to abort.\n")
       }
     } else if (!ask_yes_no("Publish a new version of this resource now?")) {
       cat("Aborted at final confirmation.\n")
