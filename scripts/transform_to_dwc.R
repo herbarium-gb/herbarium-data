@@ -419,6 +419,29 @@ if (check_media && "associatedMedia" %in% names(dwc)) {
   if (n_bad_media > 0) qa_sheets$bad_media <- bad_media
 }
 
+# --- QA: unbalanced double quotes ------------------------------------------
+# A text field with an odd number of " is almost always a data-entry error
+# (truncated label transcription). Not cleaned here - reported for FileMaker.
+
+qcount <- function(x) {
+  x <- ifelse(is.na(x), "", as.character(x))
+  nchar(x) - nchar(gsub('"', "", x, fixed = TRUE))
+}
+
+char_cols  <- names(dwc)[vapply(dwc, is.character, logical(1))]
+bad_quotes <- rbindlist(lapply(char_cols, function(cn) {
+  ix <- which(qcount(dwc[[cn]]) %% 2L == 1L)
+  if (length(ix) == 0) return(NULL)
+  data.table(
+    id    = if ("id" %in% names(dwc)) dwc$id[ix] else NA_character_,
+    field = cn,
+    value = substr(dwc[[cn]][ix], 1, 200)
+  )
+}))
+
+n_bad_quotes <- nrow(bad_quotes)
+if (n_bad_quotes > 0) qa_sheets$unbalanced_quotes <- bad_quotes
+
 # --- Export ------------------------------------------------------------------
 
 out_file <- file.path(
@@ -451,6 +474,8 @@ if (is.na(n_bad_media)) {
   cat("Invalid media links: ", format(n_bad_media, big.mark = " "), "\n", sep = "")
 }
 
+cat("Unbalanced quotes:   ", format(n_bad_quotes, big.mark = " "), "\n", sep = "")
+
 if (length(qa_sheets) > 0) {
   cat("QA file written:     ", qa_file, "\n", sep = "")
 } else {
@@ -469,8 +494,8 @@ if (!"id" %in% names(dwc)) {
 }
 
 # --- Cleanup -----------------------------------------------------------------
-# Keeps: fm_raw, dwc, bad_rt90, bad_sweref, bad_media, dup_ids (pipeline outputs)
-# Keeps: n_dup_ids, n_dup_rows, n_bad_sweref, n_bad_rt90, n_bad_media (QA counts for publish_ipt.R)
+# Keeps: fm_raw, dwc, bad_rt90, bad_sweref, bad_media, bad_quotes, dup_ids (pipeline outputs)
+# Keeps: n_dup_ids, n_dup_rows, n_bad_sweref, n_bad_rt90, n_bad_media, n_bad_quotes (QA counts)
 # Keeps: out_file (used by publish_ipt.R for version comment)
 # Keeps: input_mode, load_to_db, check_media, publish_ipt (pipeline flags)
 
@@ -480,12 +505,14 @@ rm(list = setdiff(ls(), c(
   "bad_rt90",
   "bad_sweref",
   "bad_media",
+  "bad_quotes",
   "dup_ids",
   "n_dup_ids",
   "n_dup_rows",
   "n_bad_sweref",
   "n_bad_rt90",
   "n_bad_media",
+  "n_bad_quotes",
   "out_file",
   "input_mode",
   "load_to_db",
