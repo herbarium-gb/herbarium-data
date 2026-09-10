@@ -75,11 +75,12 @@ following lines as their answers.
 Switches at the top of the script:
 
 ```r
-input_mode  <- "file"   # "file" = latest data/raw file; "fetch" = pull from FileMaker
-target      <- "test"   # "test" or "prod" - which IPT to publish to
-load_to_db  <- FALSE    # TRUE writes to PostgreSQL (TRUNCATE + reload both tables)
-check_media <- FALSE    # TRUE opens every associatedMedia URL to check it (slow)
-publish_ipt <- FALSE    # TRUE publishes a new IPT version
+input_mode   <- "file"   # "file" = latest data/raw file; "fetch" = pull from FileMaker
+target       <- "test"   # "test" or "prod" - which IPT to publish to
+refresh_dois <- FALSE    # TRUE refreshes config/dissco_dois.csv first (incremental, fast)
+load_to_db   <- FALSE    # TRUE writes to PostgreSQL (TRUNCATE + reload both tables)
+check_media  <- FALSE    # TRUE opens every associatedMedia URL to check it (slow)
+publish_ipt  <- FALSE    # TRUE publishes a new IPT version
 ```
 
 `target` selects which `IPT_TEST_*` / `IPT_PROD_*` block from `.Renviron` is
@@ -163,7 +164,8 @@ timestamp in `config/dissco_dois_synced.txt`, so later runs take seconds. Set
 `mode <- "full"` in the script to force a complete re-fetch.
 
 Run it occasionally: a new specimen gets a DOI only after DiSSCo's next
-harvest, and a DOI never changes once assigned.
+harvest, and a DOI never changes once assigned. `refresh_dois <- TRUE` in
+`run_pipeline.R` runs this step inline before the transform.
 
 ## Outputs
 

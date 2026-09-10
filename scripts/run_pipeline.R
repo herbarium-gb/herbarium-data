@@ -12,11 +12,12 @@ rm(list = ls())
 
 # --- Settings ----------------------------------------------------------------
 
-input_mode  <- "file"   # "file" or "fetch"
-target      <- "test"   # "test" or "prod" - which IPT to publish to
-load_to_db  <- FALSE
-check_media <- FALSE
-publish_ipt <- FALSE
+input_mode   <- "file"   # "file" or "fetch"
+target       <- "test"   # "test" or "prod" - which IPT to publish to
+refresh_dois <- FALSE    # TRUE refreshes config/dissco_dois.csv before the transform
+load_to_db   <- FALSE
+check_media  <- FALSE
+publish_ipt  <- FALSE
 
 # --- Validate settings -------------------------------------------------------
 
@@ -46,15 +47,20 @@ local({
 cat("Starting pipeline...\n\n")
 cat("Input mode:         ", input_mode,  "\n", sep = "")
 cat("IPT target:         ", target, " (", Sys.getenv("IPT_BASE_URL"), ")\n", sep = "")
+cat("Refresh DOIs:       ", refresh_dois, "\n", sep = "")
 cat("Load to PostgreSQL: ", load_to_db,  "\n", sep = "")
 cat("Publish to IPT:     ", publish_ipt, "\n\n", sep = "")
 
 if (input_mode == "fetch") {
   source("scripts/fetch_fm_data.R", echo = FALSE)
-  
+
   if (!exists("fm_raw", inherits = FALSE)) {
     stop("scripts/fetch_fm_data.R did not create object 'fm_raw'.")
   }
+}
+
+if (refresh_dois) {
+  source("scripts/fetch_dissco_dois.R", echo = FALSE)
 }
 
 source("scripts/transform_to_dwc.R", echo = FALSE)
