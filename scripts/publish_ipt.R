@@ -92,10 +92,7 @@ ipt_published <- (function() {
   rss_url     <- paste0(base_url, "/rss.do")
   r_param     <- utils::URLencode(ipt_resource, reserved = TRUE)
 
-  ipt_comment <- paste0(
-    "Pipeline publish ", format(Sys.time(), "%Y-%m-%d %H:%M"),
-    if (exists("out_file", inherits = TRUE) && nzchar(out_file)) paste0(" | DwC: ", basename(out_file)) else ""
-  )
+  ipt_comment <- "Pipeline publication."   # a free-text note may be appended below
 
   read_ipt_version <- function(h) {
     tryCatch({
@@ -116,8 +113,7 @@ ipt_published <- (function() {
   cat("\n--- Ready to publish ----------------------------------------------------\n")
   cat("IPT:              ", base_url,     "\n", sep = "")
   cat("Resource:         ", ipt_resource, "\n", sep = "")
-  cat("User:             ", ipt_username, "\n", sep = "")
-  cat("Version comment:  ", ipt_comment,  "\n\n", sep = "")
+  cat("User:             ", ipt_username, "\n\n", sep = "")
 
   is_prod <- !grepl("test", tolower(base_url), fixed = TRUE)
 
@@ -140,6 +136,10 @@ ipt_published <- (function() {
       cat("Aborted at final confirmation.\n")
       return(FALSE)
     }
+
+    note <- trimws(readline("Note for this version (blank = none): "))
+    if (nzchar(note)) ipt_comment <- paste0(ipt_comment, " ", note)
+    cat("Version comment:  ", ipt_comment, "\n", sep = "")
   }
 
   # --- Session: CSRF token + login -----------------------------------
