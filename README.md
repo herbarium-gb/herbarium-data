@@ -93,6 +93,8 @@ Prompts:
 - **Publish confirmation** — `test` asks for a plain `y`; any IPT whose URL
   does not contain `test` is treated as production and asks you to type
   `PROD` (exactly, uppercase).
+- **Version note** — after confirming, an optional free-text line appended to
+  the IPT version comment (blank for none).
 
 ## FileMaker Data API
 
