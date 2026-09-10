@@ -9,9 +9,9 @@ IPT on its own schedule.
 
 ```
 FileMaker  ──►  Darwin Core  ──►  PostgreSQL  ──►  IPT  ──►  GBIF  ──►  DiSSCo
- (fetch)        (transform)       (load)           (publish)  (harvest)  (mints a DOI)
-                     ▲                                                        │
-                     └──────────────  DOI, back via DataCite  ───────────────┘
+ (fetch)        (transform)       (load)           (publish)  (harvest)  (mints DOIs)
+                     ▲                                                     │
+                     └─────────────  DOI, back via DataCite  ──────────────┘
 ```
 
 The last leg is a feedback loop: DiSSCo mints a Digital Specimen DOI per
