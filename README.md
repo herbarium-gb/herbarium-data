@@ -122,7 +122,7 @@ to `5432` on the server (`5433` avoids clashing with a local PostgreSQL).
 Add a `~/.ssh/config` entry (ask the maintainer for host and user):
 
 ```
-Host herbarium-db
+Host herbarium-db            # any name; used in ssh -N below
   HostName <database server>
   User <your user>
   IdentityFile ~/.ssh/<your key>
