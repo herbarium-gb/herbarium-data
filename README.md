@@ -8,9 +8,15 @@ the result into a PostgreSQL "publication layer", and triggers an
 IPT on its own schedule.
 
 ```
-FileMaker  ──►  Darwin Core CSV  ──►  PostgreSQL  ──►  IPT version  ──►  GBIF
- (fetch)         (transform)          (load)           (publish)        (harvest)
+FileMaker  ──►  Darwin Core  ──►  PostgreSQL  ──►  IPT  ──►  GBIF  ──►  DiSSCo
+ (fetch)        (transform)       (load)           (publish)  (harvest)  (mints a DOI)
+                     ▲                                                        │
+                     └──────────────  DOI, back via DataCite  ───────────────┘
 ```
+
+The last leg is a feedback loop: DiSSCo mints a Digital Specimen DOI per
+record, and `fetch_dissco_dois.R` pulls those DOIs back from DataCite into
+the transform (see [Digital Specimen DOIs](#digital-specimen-dois)).
 
 The image server, web viewer, and the PostgreSQL/IPT deployment are managed
 separately in **[herbarium-platform](https://github.com/herbarium-gb/herbarium-platform)**.
