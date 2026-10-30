@@ -45,7 +45,7 @@ script.
 | Script | What it does |
 |--------|--------------|
 | `fetch_fm_data.R` | Pulls all records from the FileMaker Data API, writes `data/raw/fm_raw_*.xlsx`. Aborts if the API returns 0 rows. |
-| `transform_to_dwc.R` | Maps source fields to Darwin Core via `config/col-map.xlsx`, derives coordinates and `eventDate`, joins Digital Specimen DOIs if `config/dissco_dois.csv` is present, writes `data/dwc/occurrence_*.csv` and (on issues) `data/qc/qa_*.xlsx`. |
+| `transform_to_dwc.R` | Maps source fields to Darwin Core via `config/col-map.xlsx`, derives coordinates and `eventDate`, joins Digital Specimen DOIs if `config/dissco_dois.csv` is present, reports duplicate ids and ids with a DOI that are missing from the export, writes `data/dwc/occurrence_*.csv` and (on issues) `data/qc/qa_*.xlsx`. |
 | `load_to_postgres.R` | Replaces `raw.fm_specimen` and `public.dwc_occurrence` with the latest raw and DwC files. Refuses to load an empty file or duplicate ids. |
 | `publish_ipt.R` | Logs in to the IPT, publishes a new resource version, polls until it finishes, checks the record count. |
 
@@ -173,14 +173,21 @@ Run it occasionally: a new specimen gets a DOI only after DiSSCo's next
 harvest, and a DOI never changes once assigned. `refresh_dois <- TRUE` in
 `run_pipeline.R` runs this step inline before the transform.
 
+The lookup also reveals records that have left FileMaker: every id in it was
+once published, so an id that is no longer exported (deleted or renumbered)
+is listed in the `missing_ids` QA sheet with its DOI. DiSSCo keeps such
+specimens after GBIF drops them, so its count can exceed GBIF's.
+
 ## Outputs
 
 - `data/raw/fm_raw_*.xlsx` — raw FileMaker export (only on `input_mode = "fetch"`)
 - `data/dwc/occurrence_*.csv` — Darwin Core table
-- `data/qc/qa_*.xlsx` — QA sheets, only when there are issues
+- `data/qc/qa_*.xlsx` — QA sheets, only when there are issues: `bad_sweref`,
+  `bad_rt90`, `bad_media`, `unbalanced_quotes`, `dup_ids`, `missing_ids`
 
 ## Behaviour notes
 
+- All text fields are trimmed of leading/trailing whitespace and control characters (FileMaker line breaks) before mapping.
 - Coordinates are derived in order decimal → DMS → SWEREF99 TM → RT90, all output as EPSG:4326.
 - Projected coordinates outside a plausible Swedish range are excluded and reported.
 - Loading replaces all rows in the target tables.

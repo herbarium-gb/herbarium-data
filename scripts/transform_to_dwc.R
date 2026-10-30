@@ -3,6 +3,7 @@
 # ------------------------------------------------------------
 # - Loads raw herbarium export data and column mapping
 # - Uses fresh API data or latest raw export file
+# - Trims leading/trailing whitespace from all text fields
 # - Maps source fields to Darwin Core fields
 # - Standardizes eventDate from Year / Month / Day
 # - Derives decimal coordinates from:
@@ -12,6 +13,7 @@
 #   * RT90
 # - Excludes invalid projected coordinates from transformation
 # - Checks associatedMedia links
+# - Reports duplicate ids, and ids with a DiSSCo DOI missing from the export
 # - Exports DwC output and QA tables
 # ------------------------------------------------------------
 
@@ -42,6 +44,14 @@ if (exists("fm_raw", inherits = FALSE)) {
   fm_raw      <- as.data.table(read_excel(latest_file, col_types = "text"))
   input_source <- paste("file:", latest_file)
 }
+
+# Strip leading/trailing whitespace from every text field up front, so ids,
+# names and labels are clean for all later steps (GBIF and DiSSCo already
+# store ids trimmed). Control characters count as whitespace here, since
+# FileMaker writes line breaks as vertical tabs.
+fm_raw[] <- lapply(fm_raw, function(x) {
+  if (is.character(x)) trimws(x, whitespace = "[[:space:][:cntrl:]]") else x
+})
 
 col_map <- as.data.table(
   read_excel(file.path("config", "col-map.xlsx"), col_types = "text")
@@ -183,7 +193,8 @@ if ("Image1" %in% names(fm_raw) && "AccessionNo" %in% names(fm_raw)) {
 # Lookup produced by scripts/fetch_dissco_dois.R. Optional: if the file is
 # absent, digitalSpecimenID is simply left empty.
 
-doi_file <- file.path("config", "dissco_dois.csv")
+doi_file    <- file.path("config", "dissco_dois.csv")
+dissco_dois <- NULL
 if (file.exists(doi_file) && "id" %in% names(dwc)) {
   dissco_dois <- fread(doi_file, colClasses = "character")   # columns: id, digitalSpecimenID
   dwc[, digitalSpecimenID := dissco_dois$digitalSpecimenID[match(id, dissco_dois$id)]]
@@ -413,6 +424,32 @@ if ("id" %in% names(dwc)) {
   n_dup_rows <- if (n_dup_ids > 0) sum(dup_ids$N) else 0L
 }
 
+# One row per record sharing an id, with enough fields to tell them apart
+if (n_dup_ids > 0) {
+  dup_cols <- intersect(
+    c("id", "scientificName", "recordedBy", "eventDate", "country",
+      "stateProvince", "county", "locality", "verbatimLabel"),
+    names(dwc)
+  )
+  dup_rows <- dwc[id %in% dup_ids$id, dup_cols, with = FALSE][order(id)]
+  if ("verbatimLabel" %in% dup_cols) dup_rows[, verbatimLabel := substr(verbatimLabel, 1, 200)]
+  qa_sheets$dup_ids <- dup_rows
+}
+
+# --- QA: ids that have a DiSSCo DOI but are no longer exported ---------------
+# Every id in the DOI lookup was once published via GBIF. If it is missing
+# from this export, the record was deleted or renumbered in FileMaker, while
+# DiSSCo still holds it.
+
+missing_ids   <- data.table()
+n_missing_ids <- NA_integer_
+
+if (!is.null(dissco_dois)) {
+  missing_ids   <- dissco_dois[!id %in% dwc$id][order(id)]
+  n_missing_ids <- nrow(missing_ids)
+  if (n_missing_ids > 0) qa_sheets$missing_ids <- missing_ids
+}
+
 n_bad_sweref <- nrow(bad_sweref)
 n_bad_rt90   <- nrow(bad_rt90)
 
@@ -489,6 +526,12 @@ if (is.na(n_bad_media)) {
 
 cat("Unbalanced quotes:   ", format(n_bad_quotes, big.mark = " "), "\n", sep = "")
 
+if (is.na(n_missing_ids)) {
+  cat("Missing DOI ids:     not checked (no DOI lookup)\n")
+} else {
+  cat("Missing DOI ids:     ", format(n_missing_ids, big.mark = " "), "\n", sep = "")
+}
+
 if (length(qa_sheets) > 0) {
   cat("QA file written:     ", qa_file, "\n", sep = "")
 } else {
@@ -507,8 +550,8 @@ if (!"id" %in% names(dwc)) {
 }
 
 # --- Cleanup -----------------------------------------------------------------
-# Keeps: fm_raw, dwc, bad_rt90, bad_sweref, bad_media, bad_quotes, dup_ids (pipeline outputs)
-# Keeps: n_dup_ids, n_dup_rows, n_bad_sweref, n_bad_rt90, n_bad_media, n_bad_quotes (QA counts)
+# Keeps: fm_raw, dwc, bad_rt90, bad_sweref, bad_media, bad_quotes, dup_ids, missing_ids (pipeline outputs)
+# Keeps: n_dup_ids, n_dup_rows, n_bad_sweref, n_bad_rt90, n_bad_media, n_bad_quotes, n_missing_ids (QA counts)
 # Keeps: out_file (used by publish_ipt.R for version comment)
 # Keeps: input_mode, load_to_db, check_media, publish_ipt (pipeline flags)
 
@@ -520,7 +563,9 @@ rm(list = setdiff(ls(), c(
   "bad_media",
   "bad_quotes",
   "dup_ids",
+  "missing_ids",
   "n_dup_ids",
+  "n_missing_ids",
   "n_dup_rows",
   "n_bad_sweref",
   "n_bad_rt90",
