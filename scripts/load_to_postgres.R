@@ -5,6 +5,7 @@
 #   * data/raw/fm_raw_*.xlsx / .xls / .csv
 # - Uses latest DwC export file by default:
 #   * data/dwc/occurrence_*.csv
+# - Refuses to load a DwC file with duplicate ids
 # - Connects to PostgreSQL using environment variables
 # - Replaces table contents on each run:
 #   * TRUNCATE raw.fm_specimen
@@ -57,6 +58,14 @@ if (nrow(raw_df) == 0 || nrow(dwc_df) == 0) {
   stop("Refusing to load: one of the input files has 0 rows.")
 }
 
+# id is the primary key of public.dwc_occurrence; catch duplicates here
+# rather than as a COPY error after the whole file has been sent.
+dup_db_ids <- unique(dwc_df$id[duplicated(dwc_df$id)])
+if (length(dup_db_ids) > 0) {
+  stop(sprintf("Refusing to load: duplicate id in %s: %s",
+               dwc_file, paste(dup_db_ids, collapse = ", ")))
+}
+
 # --- Database connection -----------------------------------------------------
 
 con <- dbConnect(
@@ -101,4 +110,4 @@ tryCatch({
 # Keeps: input_mode, load_to_db, check_media, publish_ipt (pipeline flags)
 # Keeps: pipeline outputs from earlier steps (fm_raw, dwc, etc.)
 
-rm(get_env, get_latest_file, raw_file, dwc_file, raw_df, dwc_df, con, raw_n, dwc_n)
+rm(get_env, get_latest_file, raw_file, dwc_file, raw_df, dwc_df, dup_db_ids, con, raw_n, dwc_n)

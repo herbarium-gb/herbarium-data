@@ -46,7 +46,7 @@ script.
 |--------|--------------|
 | `fetch_fm_data.R` | Pulls all records from the FileMaker Data API, writes `data/raw/fm_raw_*.xlsx`. Aborts if the API returns 0 rows. |
 | `transform_to_dwc.R` | Maps source fields to Darwin Core via `config/col-map.xlsx`, derives coordinates and `eventDate`, joins Digital Specimen DOIs if `config/dissco_dois.csv` is present, writes `data/dwc/occurrence_*.csv` and (on issues) `data/qc/qa_*.xlsx`. |
-| `load_to_postgres.R` | Replaces `raw.fm_specimen` and `public.dwc_occurrence` with the latest raw and DwC files. Refuses to load an empty file. |
+| `load_to_postgres.R` | Replaces `raw.fm_specimen` and `public.dwc_occurrence` with the latest raw and DwC files. Refuses to load an empty file or duplicate ids. |
 | `publish_ipt.R` | Logs in to the IPT, publishes a new resource version, polls until it finishes, checks the record count. |
 
 `scripts/fetch_dissco_dois.R` is a separate occasional job — see
